@@ -21,6 +21,8 @@ import atexit
 import copy
 import threading
 
+import six
+
 from google.cloud.logging.handlers.transports.base import Transport
 
 _WORKER_THREAD_NAME = 'google.cloud.logging.handlers.transport.Worker'
@@ -136,7 +138,14 @@ class _Worker(object):
             self._entries_condition.acquire()
             if self.stopping:
                 return
-            info = {'message': message, 'python_logger': record.name}
+
+            if isinstance(record.msg, six.string_types):
+                # TODO those names must be configurable
+                info = {'event': message, 'logger': record.name}
+            else:
+                # When using structlog this will be a dict,
+                # so it'll get passed nicely to Stackdriver as a JSON payload.
+                info = record.msg
             self.batch.log_struct(info, severity=record.levelname)
             self._entries_condition.notify()
         finally:
